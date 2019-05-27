@@ -103,9 +103,10 @@ import Effect.Console (logShow, log)
 makeStore :: Effect Unit
 makeStore = do
   radox <- createStore defaultState [log] rootReducer
+  radox.dispatch (lift LoadNewDog)
   radox.dispatch (lift Up)
   radox.dispatch (lift (GotNewDog "dog"))
-  state <- liftEffect $ radox.getState
+  state <- radox.getState
   pure unit
 ```
 
@@ -117,9 +118,11 @@ We've created a Radox store, passed it out `defaultState` and `rootReducer` we d
 
 `radox.getState :: Effect state` - this retrieves the state at any time.
 
+Because we have passed it `log`, each time the state changes it will be logged into the browser console or terminal.
+
 #### What's this `lift` business?
 
-For us to use our individual action sum types (like `DogAction` or `CountingAction`) with the shared reducer, we have to run `lift` on them (provided by the library which turns them from normal values into `Variant` values).
+For us to use our individual action sum types (like `DogAction` or `CountingAction`) with the shared reducer, we have to run `lift` on them (provided by the library) to turn them from normal values into `Variant` values.
 
 #### How could I use this with React or whatever?
 
