@@ -27,7 +27,8 @@ type Dispatcher actionType
 type RadoxStore actionType stateType
   = { dispatch :: Dispatcher actionType
     , getState :: Effect stateType
-  }
+    , state    :: stateType
+    }
 
 -- | Typeclass that links any given Action sum type to the label it holds in the Combined Reducer / variant
 class HasLabel a (p :: Symbol) | a -> p 
