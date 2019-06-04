@@ -23,16 +23,10 @@ type Listeners stateType
 type Dispatcher actionType
   = actionType -> Effect Unit
 
--- | Type of the store used internally
-type RadoxInternal actionType stateType
-  = { dispatch :: Dispatcher actionType
-    , getState :: Effect stateType
-    }
-
 -- | Type of store shared around so that the state can be accessed without needing Effect
 type RadoxStore actionType stateType
   = { dispatch :: Dispatcher actionType
-    , state :: stateType
+    , getState :: Effect stateType
   }
 
 -- | Typeclass that links any given Action sum type to the label it holds in the Combined Reducer / variant

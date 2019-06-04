@@ -18,14 +18,14 @@ import Radox.Internal.Store (getState, update)
 -- |
 -- | 'rootReducer` is the function that takes our `actionType` and a `stateType` and returns the new `stateType`
 -- |
--- | This returns a RadoxInternalStore, which has a `dispatch` function for sending new actions
+-- | This returns a RadoxStore, which has a `dispatch` function for sending new actions
 -- | and a `getState` function 
 createStore 
   :: forall stateType actionType
    . stateType
   -> Listeners stateType
   -> CombinedReducer actionType stateType
-  -> Effect (RadoxInternal actionType stateType)
+  -> Effect (RadoxStore actionType stateType)
 createStore initialState listeners rootReducer = do
   stateRef <- new initialState
   pure $ { dispatch: update stateRef listeners rootReducer
@@ -52,5 +52,5 @@ emptyStore
    -> RadoxStore actionType stateType
 emptyStore initial
   = { dispatch: \_ -> pure unit
-    , state: initial
+    , getState: pure initial
     }
