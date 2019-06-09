@@ -24,12 +24,13 @@ createStore
   :: forall stateType actionType
    . stateType
   -> Listeners stateType
-  -> CombinedReducer actionType stateType
+  -> CombinedReducer actionType stateType 
   -> Effect (RadoxStore actionType stateType)
 createStore initialState listeners rootReducer = do
   stateRef <- new initialState
-  pure $ { dispatch: update stateRef listeners rootReducer
-         , getState: (getState stateRef)
+  let getState' = getState stateRef
+  pure $ { dispatch: update stateRef listeners getState' rootReducer
+         , getState: getState'
          , state: initialState
          }
 

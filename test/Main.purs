@@ -1,10 +1,11 @@
 module Test.Main where
 
-import Prelude (class Eq, class Show, Unit, bind, discard, ($), (+), (-), (<>))
+import Prelude (class Eq, class Show, Unit, bind, discard, pure, ($), (+), (-), (<>))
 
 import Data.Variant (Variant, match)
 import Effect (Effect)
 import Effect.Class (liftEffect)
+import Effect.Timer (setTimeout)
 import Test.Spec (describe, it)
 import Test.Spec.Assertions (shouldEqual)
 import Test.Spec.Reporter.Console (consoleReporter)
@@ -16,13 +17,14 @@ import Radox
 type State
   = { value     :: Int
     , dog       :: DogState
+    , waiting   :: Boolean
     }
 
 data DogState
   = NotTried
   | LookingForADog
   | FoundADog String
-  | CouldNotFindADog
+  | HeavenKnowsImMiserableNow
 
 derive instance eqDogState :: Eq DogState
 
@@ -30,31 +32,46 @@ instance showDogState :: Show DogState where
   show NotTried = "Not tried"
   show LookingForADog = "Looking for a dog"
   show (FoundADog s) = "Found a dog called " <> s
-  show CouldNotFindADog = "Could not find a dog"
+  show HeavenKnowsImMiserableNow 
+    = "Look, I'm not condoning any of the nonsense he bangs on about now by any measure."
 
 defaultState :: State
 defaultState
   = { value     : 0
     , dog       : NotTried
+    , waiting   : false
     }
 
 --- reducer 1
 
 data Dogs
   = LoadNewDog
+  | ApologiesThisDogIsTakingSoLong
   | GotNewDog String
   | DogError String
 
 instance hasLabelDogs :: HasLabel Dogs "dogs"
 
 dogReducer 
-  :: Reducer Dogs State 
-dogReducer LoadNewDog s
-  = s { dog = LookingForADog }
-dogReducer (GotNewDog url) s
-  = s { dog = (FoundADog url) }
-dogReducer (DogError e) s
-  = s { dog = CouldNotFindADog } 
+  :: EffectfulReducer Dogs State LiftedAction 
+dogReducer { dispatch, getState } action state
+  = case action of
+      LoadNewDog 
+        -> do
+          _ <- setTimeout 20000 $ dispatch $ lift $ ApologiesThisDogIsTakingSoLong
+          pure $ state { dog = LookingForADog
+                       , waiting = false 
+                       }
+      ApologiesThisDogIsTakingSoLong
+        -> do
+           currentState <- getState
+           case currentState.dog of
+              LookingForADog -> pure $ state { waiting = true }
+              _              -> pure state
+      GotNewDog url
+        -> pure $ state { dog = (FoundADog url) }
+      DogError _
+        -> pure $ state { dog = HeavenKnowsImMiserableNow } 
 
 --- reducer 2
 
@@ -65,7 +82,7 @@ data Counting
 instance hasLabelCounting :: HasLabel Counting "counting"
 
 countReducer 
-  :: Reducer Counting State 
+  :: Reducer Counting State
 countReducer Up s
   = s { value = s.value + 1 }
 countReducer Down s
@@ -79,11 +96,13 @@ type LiftedAction
             )
 
 rootReducer 
-  :: CombinedReducer LiftedAction State
-rootReducer s action' =
+  :: CombinedReducer LiftedAction State 
+rootReducer dispatch state action' =
   match
-    { counting: \action -> countReducer action s
-    , dogs:     \action -> dogReducer action s
+    { counting: \action -> 
+                    pure $ countReducer action state
+    , dogs:     \action -> 
+                    dogReducer dispatch action state
     } action'
 
 main :: Effect Unit
