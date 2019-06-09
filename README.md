@@ -99,7 +99,7 @@ An `EffectfulReducer` is similar to `Reducer`, but has the type signature
 `RadoxEffects` is a record containing useful functions to use in reducers, and
 has the following type:
 
-```
+```haskell
 type RadoxEffects state action
   = { dispatch :: (action -> Effect Unit)
     , getState :: Effect state
