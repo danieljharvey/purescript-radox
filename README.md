@@ -4,6 +4,8 @@
 
 Purescript Radox is a small state management library designed to plug into things like Purescript React. It uses [variants](https://github.com/natefaubion/purescript-variant) to help us keep all our different reducers simple to work with whilst maintaining that sweet type safety.
 
+Documentation available on [Pursuit](https://pursuit.purescript.org/packages/purescript-radox).
+
 #### OK. That's painfully vague, could I perhaps have an example?
 
 Let's look at a simple implementation with two reducers, to show how it works.
