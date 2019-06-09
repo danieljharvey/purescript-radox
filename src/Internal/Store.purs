@@ -13,16 +13,26 @@ update
   :: forall stateType actionType
    . Ref stateType
   -> Listeners stateType
-  -> CombinedReducer actionType stateType
+  -> Effect stateType
+  -> CombinedReducer actionType stateType 
   -> actionType
   -> Effect Unit
-update stateRef listeners reducers action = do
+update stateRef listeners getState' reducers action = do
+
   -- read current state
   oldState <- read stateRef
+
+  --- create effect functions for the reducers to use
+  let passedFuncs = { dispatch: update stateRef listeners getState' reducers
+                    , getState: getState'
+                    }
+
   -- calculate new state
-  let newState = reducers oldState action
+  newState <- reducers passedFuncs oldState action
+
   -- announce new state to listeners
   _ <- traverse (\f -> f newState) listeners
+
   -- save new state
   write newState stateRef
 

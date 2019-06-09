@@ -1,6 +1,6 @@
 # Purescript Radox
 
-## It's like Redux, but even cleaner!
+## It's Like Redux, But Even Cleaner!
 
 Purescript Radox is a small state management library designed to plug into things like Purescript React. It uses [variants](https://github.com/natefaubion/purescript-variant) to help us keep all our different reducers simple to work with whilst maintaining that sweet type safety.
 
@@ -18,43 +18,25 @@ data DogState
   = NotTried
   | LookingForADog
   | FoundADog String
-  | CouldNotFindADog
+  | HeavenKnowsImMiserableNow
 
 type State
   = { value     :: Int
     , dog       :: DogState
+    , waiting   :: Boolean
     }
 
 defaultState :: State
 defaultState
   = { value     : 0
     , dog       : NotTried
+    , waiting   : false
     }
 ```
 
-2. We'd like to be able to change this data but in a nice clean way. Here is how we'd express the dog-based logic changes.
+2. We'd like to be able to change this data in a nice clean way. Here is how we'd express the arbitrary counting that we'd like to do. Hopefully if you've used Elm or Redux this should seem pretty familiar to you.
 
-```haskell
-data DogAction
-  = LoadNewDog
-  | GotNewDog String
-  | DogError String
-
-instance hasLabelDogAction :: HasLabel DogAction "dogs"
-
-dogReducer 
-  :: DogAction -> State -> State
-dogReducer LoadNewDog state
-  = state { dog = LookingForADog }
-dogReducer (GotNewDog url) state
-  = state { dog = (FoundADog url) }
-dogReducer (DogError e) state
-  = state { dog = CouldNotFindADog } 
-```
-
-(As is hopefully clear, `DogAction` is a sum type of the different dog-related events that may happen, and `dogReducer` is a function that actions them onto the `State`.)
-
-3. We've also got some arbitrary counting that we'd like to do, so let's smash together another reducer to do that.
+A `Reducer` function has the type `action -> state -> state`.
 
 ```haskell
 data CountingAction
@@ -64,12 +46,69 @@ data CountingAction
 instance hasLabelCountingAction :: HasLabel CountingAction "counting"
 
 countingReducer 
-  :: CountingAction -> State -> State
-countingReducer Up state
-  = state { value = state.value + 1 }
-countingReducer Down s
-  = state { value = state.value - 1 }
+  :: Reducer CountingAction State
+countingReducer action state
+  = case action of
+      Up 
+        -> state { value = state.value + 1 }
+      Down 
+        -> state { value = state.value - 1 }
 ```
+
+(As is hopefully clear, `CountingAction` is a sum type of the different counting-related events that may happen, and `countingReducer` is a function that actions them onto the `State`.)
+
+3. We'd like to be able to change the dog portions of this data. But wait! We also need some effectful things to happen in the Real World when this is happening. Here is how we'd express the dog-based logic changes.
+
+```haskell
+data Dogs
+  = LoadNewDog
+  | ApologiesThisDogIsTakingSoLong
+  | GotNewDog String
+  | DogError String
+
+instance hasLabelDogs :: HasLabel Dogs "dogs"
+
+dogReducer 
+  :: EffectfulReducer Dogs State AnyAction 
+dogReducer { dispatch, getState } action state
+  = case action of
+      LoadNewDog 
+        -> do
+          _ <- setTimeout 20000 $ dispatch $ lift $ ApologiesThisDogIsTakingSoLong
+          pure $ state { dog = LookingForADog
+                       , waiting = false 
+                       }
+
+      ApologiesThisDogIsTakingSoLong
+        -> do
+           currentState <- getState
+           case currentState.dog of
+              LookingForADog -> pure $ state { waiting = true }
+              _              -> pure state
+
+      GotNewDog url
+        -> pure $ state { dog = (FoundADog url) }
+
+      DogError _
+        -> pure $ state { dog = HeavenKnowsImMiserableNow } 
+```
+
+An `EffectfulReducer` is similar to `Reducer`, but has the type signature
+`(RadoxEffects state action) -> action -> state -> Effect state`.
+
+`RadoxEffects` is a record containing useful functions to use in reducers, and
+has the following type:
+
+```haskell
+type RadoxEffects state action
+  = { dispatch :: (action -> Effect Unit)
+    , getState :: Effect state
+    }
+```
+
+This means that our effectful reducer is able to inspect the current state at
+any point, and dispatch further actions.
+
 
 4. We can now make a combined reducer that works on all of these at once. First we create a type that contains all our action types:
 
@@ -86,13 +125,19 @@ type AnyAction
 
 ```haskell
 rootReducer 
-  :: State -> AnyAction -> State
-rootReducer s action' =
+  :: CombinedReducer LiftedAction State 
+rootReducer dispatch state action' =
   match
-    { counting: \action -> countReducer action s
-    , dogs:     \action -> dogReducer action s
+    { counting: \action -> 
+                    pure $ countReducer action state
+    , dogs:     \action -> 
+                    dogReducer dispatch action state
     } action'
 ```
+
+(Our `CombinedReducer` type must return an `Effect` type - hence it adds `pure`
+to the regular `Reducer` of `counting`, but does not need to for the already effectful
+`EffectfulReducer` of `dogs`.)
 
 6. That's all quite nice - but let's actually save the outcome as well. Let's create a Radox store and use it.
 
@@ -126,8 +171,8 @@ For us to use our individual action sum types (like `DogAction` or `CountingActi
 
 #### How could I use this with React or whatever?
 
-That is coming, but in a separate library. Worry not.
+I wanted to avoid tying the store itself into a particular library, so a separate library that provides tools to connect this with Context in Purescript React live here as [purescript-react-radox](https://github.com/danieljharvey/purescript-react-radox).
 
-#### How is this cleaner, exactly.
+#### How is this cleaner, exactly?
 
-It has less features.
+I mean basically it has less features.
