@@ -20,7 +20,7 @@ data DogState
   = NotTried
   | LookingForADog
   | FoundADog String
-  | HeavenKnowsImMiserableNow
+  | HeavenKnowsI'mMiserableNow
 
 type State
   = { value     :: Int
@@ -92,7 +92,7 @@ dogReducer { dispatch, getState } action state
         -> pure $ state { dog = (FoundADog url) }
 
       DogError _
-        -> pure $ state { dog = HeavenKnowsImMiserableNow } 
+        -> pure $ state { dog = HeavenKnowsI'mMiserableNow } 
 ```
 
 An `EffectfulReducer` is similar to `Reducer`, but has the type signature

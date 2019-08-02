@@ -24,7 +24,7 @@ data DogState
   = NotTried
   | LookingForADog
   | FoundADog String
-  | HeavenKnowsImMiserableNow
+  | HeavenKnowsI'mMiserableNow
 
 derive instance eqDogState :: Eq DogState
 
@@ -32,7 +32,7 @@ instance showDogState :: Show DogState where
   show NotTried = "Not tried"
   show LookingForADog = "Looking for a dog"
   show (FoundADog s) = "Found a dog called " <> s
-  show HeavenKnowsImMiserableNow 
+  show HeavenKnowsI'mMiserableNow 
     = "Look, I'm not condoning any of the nonsense he bangs on about now by any measure."
 
 defaultState :: State
@@ -71,7 +71,7 @@ dogReducer { dispatch, getState } action state
       GotNewDog url
         -> pure $ state { dog = (FoundADog url) }
       DogError _
-        -> pure $ state { dog = HeavenKnowsImMiserableNow } 
+        -> pure $ state { dog = HeavenKnowsI'mMiserableNow } 
 
 --- reducer 2
 
