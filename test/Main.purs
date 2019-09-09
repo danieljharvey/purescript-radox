@@ -1,9 +1,10 @@
 module Test.Main where
 
-import Prelude (class Eq, class Show, Unit, bind, discard, pure, ($), (+), (-), (<>))
+import Prelude (class Eq, class Show, Unit, bind, discard, pure, unit, ($), (+), (-), (<>)) 
 
 import Data.Variant (Variant, match)
 import Effect (Effect)
+import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
 import Effect.Timer (setTimeout)
 import Test.Spec (describe, it)
@@ -54,24 +55,33 @@ instance hasLabelDogs :: HasLabel Dogs "dogs"
 
 dogReducer 
   :: EffectfulReducer Dogs State LiftedAction 
-dogReducer { dispatch, getState } action state
+dogReducer { dispatch } action state
   = case action of
       LoadNewDog 
-        -> do
-          _ <- setTimeout 20000 $ dispatch $ lift $ ApologiesThisDogIsTakingSoLong
-          pure $ state { dog = LookingForADog
-                       , waiting = false 
-                       }
+        -> WithEffects (state { dog = LookingForADog
+                               , waiting = false 
+                               }) 
+                       (warnAfterTimeout dispatch)
+
       ApologiesThisDogIsTakingSoLong
-        -> do
-           currentState <- getState
-           case currentState.dog of
-              LookingForADog -> pure $ state { waiting = true }
-              _              -> pure state
+        -> case state.dog of
+              LookingForADog -> NoEffects $ state { waiting = true }
+              _              -> NoOp
+
       GotNewDog url
-        -> pure $ state { dog = (FoundADog url) }
+        -> NoEffects $ state { dog = (FoundADog url) }
+
       DogError _
-        -> pure $ state { dog = HeavenKnowsI'mMiserableNow } 
+        -> NoEffects $ state { dog = HeavenKnowsI'mMiserableNow } 
+
+warnAfterTimeout
+  :: (LiftedAction -> Effect Unit)
+  -> Aff Unit
+warnAfterTimeout dispatch = 
+  liftEffect $ do
+     let action = dispatch (lift ApologiesThisDogIsTakingSoLong)
+     _ <- setTimeout 200 action
+     pure unit
 
 --- reducer 2
 
@@ -100,7 +110,7 @@ rootReducer
 rootReducer dispatch state action' =
   match
     { counting: \action -> 
-                    pure $ countReducer action state
+                    NoEffects $ countReducer action state
     , dogs:     \action -> 
                     dogReducer dispatch action state
     } action'

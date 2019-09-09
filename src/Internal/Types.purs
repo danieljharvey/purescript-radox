@@ -2,18 +2,26 @@ module Radox.Internal.Types where
 
 import Prelude
 import Effect (Effect)
+import Effect.Aff (Aff)
 
 type RadoxEffects combinedActionType stateType
   = { dispatch :: combinedActionType -> Effect Unit
     , getState :: Effect stateType
     }
 
+-- | Type of return value from reducer
+data ReducerReturn stateType
+  = NoOp
+  | NoEffects stateType
+  | WithEffects stateType (Aff Unit)
+  | EffectsOnly (Aff Unit)
+
 -- | Type for any user-created Reducer function that takes an Action for a specific reducer, the entire state, and returns a new copy of the state
 type EffectfulReducer actionType stateType combinedActionType
   =  RadoxEffects combinedActionType stateType
   -> actionType
   -> stateType
-  -> Effect stateType
+  -> ReducerReturn stateType
 
 -- | Type for a reducer that does need to trigger any side effects
 type Reducer actionType stateType
@@ -26,7 +34,7 @@ type CombinedReducer combinedActionType stateType
   =  RadoxEffects combinedActionType stateType
   -> stateType
   -> combinedActionType
-  -> Effect stateType
+  -> ReducerReturn stateType
 
 -- | A Listener is a function that takes the new state and returns Effect Unit (so that it can use it to do something interesting, hopefully)
 type Listeners stateType
@@ -40,7 +48,6 @@ type Dispatcher combinedActionType
 type RadoxStore combinedActionType stateType
   = { dispatch :: Dispatcher combinedActionType
     , getState :: Effect stateType
-    , state    :: stateType
     }
 
 -- | Typeclass that links any given Action sum type to the label it holds in the Combined Reducer / variant
