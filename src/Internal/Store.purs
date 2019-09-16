@@ -26,6 +26,7 @@ update stateRef listeners getState' reducers action = do
   --- create effect functions for the reducers to use
   let passedFuncs = { dispatch: update stateRef listeners getState' reducers
                     , getState: getState'
+                    , state: oldState
                     }
 
   -- calculate new state
@@ -51,9 +52,9 @@ stateFromResponse
 stateFromResponse oldState return
   = case return of
       NoOp -> oldState
-      NoEffects state -> state
-      WithEffects state _ -> state
-      EffectsOnly _ -> oldState
+      UpdateState state -> state
+      UpdateStateAndRunEffect state _ -> state
+      RunEffect _ -> oldState
 
 -- | calculate which effects to fire from the response
 affFromResponse
@@ -63,9 +64,9 @@ affFromResponse
 affFromResponse return
   = case return of
       NoOp -> pure unit
-      NoEffects _ -> pure unit 
-      WithEffects _ a -> a
-      EffectsOnly a -> a
+      UpdateState _ -> pure unit 
+      UpdateStateAndRunEffect _ a -> a
+      RunEffect a -> a
 
 -- | Read the current state this is saved in the mutable Ref and returns it
 getState

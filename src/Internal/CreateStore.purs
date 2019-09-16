@@ -31,6 +31,7 @@ createStore initialState listeners rootReducer = do
   let getState' = getState stateRef
   pure $ { dispatch: update stateRef listeners getState' rootReducer
          , getState: getState'
+         , state: initialState
          }
 
 -- | When we `dispatch` an action, we need to first lift it into our main Variant type
@@ -54,4 +55,5 @@ emptyStore
 emptyStore initial
   = { dispatch: \_ -> pure unit
     , getState: pure initial
+    , state: initial
     }
