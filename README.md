@@ -71,32 +71,38 @@ data Dogs
 instance hasLabelDogs :: HasLabel Dogs "dogs"
 
 dogReducer 
-  :: EffectfulReducer Dogs State AnyAction 
-dogReducer { dispatch, getState } action state
+  :: EffectfulReducer Dogs State LiftedAction 
+dogReducer { dispatch } action state
   = case action of
       LoadNewDog 
-        -> do
-          _ <- setTimeout 20000 $ dispatch $ lift $ ApologiesThisDogIsTakingSoLong
-          pure $ state { dog = LookingForADog
-                       , waiting = false 
-                       }
+        -> UpdateStateAndRunEffect (state { dog = LookingForADog
+                                   , waiting = false 
+                                   }) 
+                       (warnAfterTimeout dispatch)
 
       ApologiesThisDogIsTakingSoLong
-        -> do
-           currentState <- getState
-           case currentState.dog of
-              LookingForADog -> pure $ state { waiting = true }
-              _              -> pure state
+        -> case state.dog of
+              LookingForADog -> UpdateState $ state { waiting = true }
+              _              -> NoOp
 
       GotNewDog url
-        -> pure $ state { dog = (FoundADog url) }
+        -> UpdateState $ state { dog = (FoundADog url) }
 
       DogError _
-        -> pure $ state { dog = HeavenKnowsI'mMiserableNow } 
+        -> UpdateState $ state { dog = HeavenKnowsI'mMiserableNow } 
+
+warnAfterTimeout
+  :: (LiftedAction -> Effect Unit)
+  -> Aff Unit
+warnAfterTimeout dispatch = 
+  liftEffect $ do
+     let action = dispatch (lift ApologiesThisDogIsTakingSoLong)
+     _ <- setTimeout 200 action
+     pure unit
 ```
 
 An `EffectfulReducer` is similar to `Reducer`, but has the type signature
-`(RadoxEffects state action) -> action -> state -> Effect state`.
+`(RadoxEffects state action) -> action -> state -> ReducerReturn`.
 
 `RadoxEffects` is a record containing useful functions to use in reducers, and
 has the following type:
@@ -105,12 +111,29 @@ has the following type:
 type RadoxEffects state action
   = { dispatch :: (action -> Effect Unit)
     , getState :: Effect state
+    , state    :: state
     }
 ```
 
 This means that our effectful reducer is able to inspect the current state at
 any point, and dispatch further actions.
 
+What the hell is `ReducerReturn` though? If you've used Purescript Thermite or
+ReasonReact this might be familiar to you - it lets us either return some new
+state, some sort of effect (inside an `Aff`) or a combination of the two.
+
+```haskell
+-- | Type of return value from reducer
+data ReducerReturn stateType
+  = NoOp
+  | UpdateState stateType
+  | UpdateStateAndRunEffect stateType (Aff Unit)
+  | RunEffect (Aff Unit)
+```
+
+Therefore, we use `NoOp` to do nothing, `UpdateState` to return a new `state`,
+`UpdateStateAndRunEffect` to change the state and do something, or `RunEffect`
+to just do something and leave the state alone. 
 
 4. We can now make a combined reducer that works on all of these at once. First we create a type that contains all our action types:
 
@@ -131,15 +154,13 @@ rootReducer
 rootReducer dispatch state action' =
   match
     { counting: \action -> 
-                    pure $ countReducer action state
+                    UpdateState $ countReducer action state
     , dogs:     \action -> 
                     dogReducer dispatch action state
     } action'
 ```
 
-(Our `CombinedReducer` type must return an `Effect` type - hence it adds `pure`
-to the regular `Reducer` of `counting`, but does not need to for the already effectful
-`EffectfulReducer` of `dogs`.)
+(Our `CombinedReducer` type must return an `ReducerReturn` type from above, therefore we wrap the output of the regular `Reducer` of `counting` with `UpdateState`, but does not need to for the already wrapped `EffectfulReducer` of `dogs`.)
 
 6. That's all quite nice - but let's actually save the outcome as well. Let's create a Radox store and use it.
 
