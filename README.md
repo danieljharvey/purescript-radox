@@ -75,9 +75,10 @@ dogReducer
 dogReducer { dispatch } action state
   = case action of
       LoadNewDog 
-        -> UpdateStateAndRunEffect (state { dog = LookingForADog
-                                   , waiting = false 
-                                   }) 
+        -> UpdateStateAndRunEffect 
+                       (state { dog = LookingForADog
+                              , waiting = false 
+                              }) 
                        (warnAfterTimeout dispatch)
 
       ApologiesThisDogIsTakingSoLong
