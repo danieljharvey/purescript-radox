@@ -1,6 +1,6 @@
 module Radox.Internal.CreateStore where
 
-import Prelude (bind, pure, unit, ($))
+import Prelude (bind, pure, unit, ($)) 
 import Effect (Effect)
 import Effect.Ref (new)
 import Data.Variant (SProxy(..), Variant, inj)

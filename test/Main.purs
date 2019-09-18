@@ -1,15 +1,16 @@
 module Test.Main where
 
-import Prelude (class Eq, class Show, Unit, bind, discard, pure, ($), (+), (-), (<>))
+import Prelude (class Eq, class Show, Unit, bind, discard, pure, unit, ($), (+), (-), (<>)) 
 
 import Data.Variant (Variant, match)
 import Effect (Effect)
+import Effect.Aff (Aff, launchAff_)
 import Effect.Class (liftEffect)
 import Effect.Timer (setTimeout)
 import Test.Spec (describe, it)
 import Test.Spec.Assertions (shouldEqual)
 import Test.Spec.Reporter.Console (consoleReporter)
-import Test.Spec.Runner (run)
+import Test.Spec.Runner (runSpec)
 
 import Radox
 
@@ -54,24 +55,33 @@ instance hasLabelDogs :: HasLabel Dogs "dogs"
 
 dogReducer 
   :: EffectfulReducer Dogs State LiftedAction 
-dogReducer { dispatch, getState } action state
+dogReducer { dispatch } action state
   = case action of
       LoadNewDog 
-        -> do
-          _ <- setTimeout 20000 $ dispatch $ lift $ ApologiesThisDogIsTakingSoLong
-          pure $ state { dog = LookingForADog
-                       , waiting = false 
-                       }
+        -> UpdateStateAndRunEffect (state { dog = LookingForADog
+                               , waiting = false 
+                               }) 
+                       (warnAfterTimeout dispatch)
+
       ApologiesThisDogIsTakingSoLong
-        -> do
-           currentState <- getState
-           case currentState.dog of
-              LookingForADog -> pure $ state { waiting = true }
-              _              -> pure state
+        -> case state.dog of
+              LookingForADog -> UpdateState $ state { waiting = true }
+              _              -> NoOp
+
       GotNewDog url
-        -> pure $ state { dog = (FoundADog url) }
+        -> UpdateState $ state { dog = (FoundADog url) }
+
       DogError _
-        -> pure $ state { dog = HeavenKnowsI'mMiserableNow } 
+        -> UpdateState $ state { dog = HeavenKnowsI'mMiserableNow } 
+
+warnAfterTimeout
+  :: (LiftedAction -> Effect Unit)
+  -> Aff Unit
+warnAfterTimeout dispatch = 
+  liftEffect $ do
+     let action = dispatch (lift ApologiesThisDogIsTakingSoLong)
+     _ <- setTimeout 200 action
+     pure unit
 
 --- reducer 2
 
@@ -100,14 +110,14 @@ rootReducer
 rootReducer dispatch state action' =
   match
     { counting: \action -> 
-                    pure $ countReducer action state
+                    UpdateState $ countReducer action state
     , dogs:     \action -> 
                     dogReducer dispatch action state
     } action'
 
 main :: Effect Unit
 main =
-  run [consoleReporter] do
+  launchAff_ $ runSpec [consoleReporter] do
     describe "Radox" do
       it "Increments counter twice" $ do
         radox <- liftEffect $ createStore defaultState [] rootReducer
